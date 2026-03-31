@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finansal Takip</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0F172A;
+            --surface: #1E293B;
+            --surface2: #273548;
+            --border: #334155;
+            --text: #F1F5F9;
+            --text-muted: #94A3B8;
+            --primary: #818CF8;
+            --primary-dark: #6366F1;
+            --green: #10B981;
+            --red: #EF4444;
+            --yellow: #F59E0B;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header h1 { font-size: 1.2rem; font-weight: 700; color: var(--primary); letter-spacing: -0.3px; }
+
+        .month-nav { display: flex; align-items: center; gap: 10px; }
+
+        .month-nav button {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s;
+        }
+        .month-nav button:hover { background: var(--border); }
+
+        .month-label {
+            font-weight: 600; font-size: 0.95rem;
+            min-width: 130px; text-align: center;
+        }
+
+        /* ── Nav ── */
+        .nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            padding: 0 20px;
+            gap: 2px;
+            overflow-x: auto;
+        }
+
+        .nav-btn {
+            background: none; border: none;
+            color: var(--text-muted);
+            padding: 12px 18px;
+            cursor: pointer;
+            font-size: 0.875rem; font-weight: 500;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .nav-btn:hover { color: var(--text); }
+        .nav-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        /* ── Main ── */
+        .main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Summary Cards ── */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+        }
+
+        .card-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+
+        .card-value { font-size: 1.65rem; font-weight: 700; white-space: nowrap; }
+        .card-value.green  { color: var(--green); }
+        .card-value.red    { color: var(--red); }
+        .card-value.yellow { color: var(--yellow); }
+        .card-value.primary { color: var(--primary); }
+
+        /* ── Charts ── */
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .chart-title {
+            font-size: 0.82rem; font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+        }
+
+        .chart-container { position: relative; height: 230px; }
+
+        /* ── Breakdown ── */
+        .breakdown-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .breakdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.875rem;
+        }
+
+        .breakdown-name { min-width: 100px; font-weight: 500; }
+
+        .breakdown-bar-wrap {
+            flex: 1; height: 7px;
+            background: var(--surface2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .breakdown-bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
+
+        .breakdown-val { min-width: 90px; text-align: right; color: var(--text-muted); }
+
+        /* ── Section header ── */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .section-title { font-size: 1rem; font-weight: 600; }
+
+        /* ── Buttons ── */
+        .btn {
+            background: var(--primary-dark);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem; font-weight: 500;
+            transition: opacity 0.15s;
+            white-space: nowrap;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-sm   { padding: 4px 10px; font-size: 0.78rem; border-radius: 6px; }
+        .btn-red  { background: var(--red); }
+        .btn-green { background: var(--green); color: #fff; }
+        .btn-ghost {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        /* ── Filter ── */
+        .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+
+        .filter-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            outline: none;
+        }
+        .filter-select:focus { border-color: var(--primary); }
+
+        /* ── List ── */
+        .list { display: flex; flex-direction: column; gap: 8px; }
+
+        .list-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 13px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            transition: border-color 0.15s;
+        }
+        .list-item:hover { border-color: #475569; }
+
+        .list-item-left { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+        .list-item-name {
+            font-weight: 500; font-size: 0.9rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .list-item-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        .list-item-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .list-item-amount { font-weight: 700; font-size: 1rem; white-space: nowrap; }
+        .amount-income  { color: var(--green); }
+        .amount-expense { color: var(--red); }
+
+        /* ── Badges ── */
+        .badge {
+            font-size: 0.68rem; padding: 2px 8px;
+            border-radius: 99px; font-weight: 500;
+            white-space: nowrap;
+        }
+        .badge-cat      { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+        .badge-rec      { background: #7C3AED22; color: #A78BFA; border: 1px solid #7C3AED55; }
+        .badge-active   { background: #10B98122; color: #6EE7B7; border: 1px solid #10B98155; }
+        .badge-inactive { background: #EF444422; color: #FCA5A5; border: 1px solid #EF444455; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 100;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%; max-width: 450px;
+            margin: 16px;
+            animation: fadeUp 0.18s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title { font-size: 1.05rem; font-weight: 700; }
+
+        .modal-close {
+            background: none; border: none;
+            color: var(--text-muted); font-size: 1.2rem;
+            cursor: pointer; padding: 4px; line-height: 1;
+        }
+        .modal-close:hover { color: var(--text); }
+
+        /* ── Form ── */
+        .form-group { margin-bottom: 14px; }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem; font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-control:focus { border-color: var(--primary); }
+        select.form-control { cursor: pointer; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+        /* ── Toggle ── */
+        .toggle-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; margin-bottom: 4px;
+        }
+        .toggle { position: relative; width: 44px; height: 24px; }
+        .toggle input { display: none; }
+        .toggle-slider {
+            position: absolute; inset: 0;
+            background: var(--border);
+            border-radius: 12px; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-slider:before {
+            content: '';
+            position: absolute;
+            width: 18px; height: 18px;
+            background: white; border-radius: 50%;
+            top: 3px; left: 3px;
+            transition: transform 0.2s;
+        }
+        .toggle input:checked + .toggle-slider { background: var(--green); }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+        /* ── Responsive ── */
+        @media (max-width: 680px) {
+            .charts { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .header { padding: 12px 16px; }
+            .main { padding: 16px; }
+            .list-item-right .btn-sm:not(:last-child) { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ Header ══ -->
+<div class="header">
+    <h1>&#9881; Finansal Takip</h1>
+    <div class="month-nav">
+        <button id="prevMonth" title="Önceki ay">&#8249;</button>
+        <span class="month-label" id="monthLabel"></span>
+        <button id="nextMonth" title="Sonraki ay">&#8250;</button>
+    </div>
+</div>
+
+<!-- ══ Nav ══ -->
+<nav class="nav">
+    <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="nav-btn" data-tab="incomes">Gelirler</button>
+    <button class="nav-btn" data-tab="expenses">Giderler</button>
+    <button class="nav-btn" data-tab="recurring">Düzenli</button>
+    <button class="nav-btn" data-tab="savings">Birikim</button>
+</nav>
+
+<!-- ══ Main ══ -->
+<main class="main">
+
+    <!-- Dashboard -->
+    <div class="tab-panel active" id="tab-dashboard">
+        <div class="cards">
+            <div class="card">
+                <div class="card-label">Toplam Gelir</div>
+                <div class="card-value green" id="dash-income">&#8378;0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Toplam Gider</div>
+                <div class="card-value red" id="dash-expense">&#8378;0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Net Bakiye</div>
+                <div class="card-value primary" id="dash-net">&#8378;0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Sabit Gider (Düzenli)</div>
+                <div class="card-value yellow" id="dash-fixed">&#8378;0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Toplam Birikim</div>
+                <div class="card-value" style="color:#A78BFA" id="dash-savings">&#8378;0</div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart-card">
+                <div class="chart-title">Kategori Dağılımı</div>
+                <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Sabit vs Değişken Gider</div>
+                <div class="chart-container"><canvas id="fixedVarChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-title">Kategori Detayı</div>
+            <div id="categoryBreakdown" class="breakdown-list"></div>
+        </div>
+    </div>
+
+    <!-- Gelirler -->
+    <div class="tab-panel" id="tab-incomes">
+        <div class="section-header">
+            <span class="section-title">Gelirler</span>
+            <button class="btn" onclick="openModal('income')">+ Gelir Ekle</button>
+        </div>
+        <div id="income-list" class="list"></div>
+    </div>
+
+    <!-- Giderler -->
+    <div class="tab-panel" id="tab-expenses">
+        <div class="section-header">
+            <span class="section-title">Giderler</span>
+            <button class="btn" onclick="openModal('expense')">+ Gider Ekle</button>
+        </div>
+        <div class="filter-bar">
+            <select class="filter-select" id="expCatFilter" onchange="renderExpenses()">
+                <option value="">Tüm Kategoriler</option>
+            </select>
+        </div>
+        <div id="expense-list" class="list"></div>
+    </div>
+
+    <!-- Düzenli -->
+    <div class="tab-panel" id="tab-recurring">
+        <div class="section-header">
+            <span class="section-title">Düzenli Giderler</span>
+            <button class="btn" onclick="openModal('recurring')">+ Düzenli Gider Ekle</button>
+        </div>
+        <div id="recurring-list" class="list"></div>
+
+        <div class="section-header" style="margin-top:28px">
+            <span class="section-title">Düzenli Gelirler</span>
+            <button class="btn btn-green" onclick="openModal('rec-income')">+ Düzenli Gelir Ekle</button>
+        </div>
+        <div id="recurring-income-list" class="list"></div>
+    </div>
+
+    <!-- Birikim -->
+    <div class="tab-panel" id="tab-savings">
+        <div class="section-header">
+            <span class="section-title">Birikim &amp; Yatırımlar</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-ghost" onclick="addNetBalance()" id="btn-add-net">+ Bu Ayın Net Bakiyesini Ekle</button>
+                <button class="btn" onclick="openModal('savings')">+ Birikim Ekle</button>
+            </div>
+        </div>
+        <div id="savings-type-cards" class="cards" style="margin-bottom:20px"></div>
+        <div class="charts" style="margin-bottom:20px">
+            <div class="chart-card">
+                <div class="chart-title">Tür Dağılımı</div>
+                <div class="chart-container"><canvas id="savingsChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Birikim Özeti</div>
+                <div id="savings-breakdown" class="breakdown-list"></div>
+            </div>
+        </div>
+        <div id="savings-list" class="list"></div>
+    </div>
+
+</main>
+
+<!-- ══ Modal: Gelir ══ -->
+<div class="modal-overlay" id="modal-income">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-income-title">Gelir Ekle</span>
+            <button class="modal-close" onclick="closeModal('income')">&#10005;</button>
+        </div>
+        <form id="form-income" onsubmit="saveIncome(event)">
+            <input type="hidden" id="income-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Miktar (&#8378;)</label>
+                    <input class="form-control" type="number" id="income-amount" min="0" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tarih</label>
+                    <input class="form-control" type="date" id="income-date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori</label>
+                <select class="form-control" id="income-category">
+                    <option>Maaş</option>
+                    <option>Freelance</option>
+                    <option>Kira Geliri</option>
+                    <option>Yatırım</option>
+                    <option>Prim / Bonus</option>
+                    <option>Diğer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama</label>
+                <input class="form-control" type="text" id="income-desc" placeholder="Opsiyonel">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('income')">İptal</button>
+                <button type="submit" class="btn">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ Modal: Harcama ══ -->
+<div class="modal-overlay" id="modal-expense">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-expense-title">Gider Ekle</span>
+            <button class="modal-close" onclick="closeModal('expense')">&#10005;</button>
+        </div>
+        <form id="form-expense" onsubmit="saveExpense(event)">
+            <input type="hidden" id="expense-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Miktar (&#8378;)</label>
+                    <input class="form-control" type="number" id="expense-amount" min="0" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tarih</label>
+                    <input class="form-control" type="date" id="expense-date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori</label>
+                <select class="form-control" id="expense-category">
+                    <option>Market</option>
+                    <option>Ulaşım</option>
+                    <option>Kira</option>
+                    <option>Abonelik</option>
+                    <option>Lüks</option>
+                    <option>Sağlık</option>
+                    <option>Eğitim</option>
+                    <option>Eğlence</option>
+                    <option>Restoran</option>
+                    <option>Giyim</option>
+                    <option>Fatura</option>
+                    <option>Kredi Ödemesi</option>
+                    <option>Diğer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama</label>
+                <input class="form-control" type="text" id="expense-desc" placeholder="Opsiyonel">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('expense')">İptal</button>
+                <button type="submit" class="btn">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ Modal: Düzenli ══ -->
+<div class="modal-overlay" id="modal-recurring">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-recurring-title">Düzenli Gider Ekle</span>
+            <button class="modal-close" onclick="closeModal('recurring')">&#10005;</button>
+        </div>
+        <form id="form-recurring" onsubmit="saveRecurring(event)">
+            <input type="hidden" id="rec-id">
+            <div class="form-group">
+                <label class="form-label">Ad</label>
+                <input class="form-control" type="text" id="rec-name" required placeholder="Netflix, Kira, İnternet...">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Miktar (&#8378;)</label>
+                    <input class="form-control" type="number" id="rec-amount" min="0" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ayın kaçında?</label>
+                    <input class="form-control" type="number" id="rec-day" min="1" max="31" value="1" placeholder="1–31">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori</label>
+                <select class="form-control" id="rec-category">
+                    <option>Abonelik</option>
+                    <option>Kira</option>
+                    <option>Fatura</option>
+                    <option>Kredi Ödemesi</option>
+                    <option>Ulaşım</option>
+                    <option>Sağlık</option>
+                    <option>Eğitim</option>
+                    <option>Diğer</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Bitiş Ayı (opsiyonel)</label>
+                    <input class="form-control" type="month" id="rec-end" placeholder="Belirtilmezse süresiz">
+                </div>
+                <div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end">
+                    <span id="rec-end-preview" style="font-size:0.8rem;color:var(--text-muted);padding-bottom:9px"></span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama</label>
+                <input class="form-control" type="text" id="rec-desc" placeholder="Opsiyonel">
+            </div>
+            <div class="toggle-row">
+                <span class="form-label" style="margin:0">Aktif</span>
+                <label class="toggle">
+                    <input type="checkbox" id="rec-active" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('recurring')">İptal</button>
+                <button type="submit" class="btn">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ Modal: Düzenli Gelir ══ -->
+<div class="modal-overlay" id="modal-rec-income">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-rec-income-title">Düzenli Gelir Ekle</span>
+            <button class="modal-close" onclick="closeModal('rec-income')">&#10005;</button>
+        </div>
+        <form id="form-rec-income" onsubmit="saveRecurringIncome(event)">
+            <input type="hidden" id="rci-id">
+            <div class="form-group">
+                <label class="form-label">Ad</label>
+                <input class="form-control" type="text" id="rci-name" required placeholder="Maaş, Kira Geliri, vb.">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Miktar (&#8378;)</label>
+                    <input class="form-control" type="number" id="rci-amount" min="0" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ayın kaçında?</label>
+                    <input class="form-control" type="number" id="rci-day" min="1" max="31" value="1" placeholder="1–31">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Sıklık</label>
+                    <select class="form-control" id="rci-frequency">
+                        <option value="1">Aylık</option>
+                        <option value="3">3 Ayda Bir</option>
+                        <option value="6">6 Ayda Bir</option>
+                        <option value="12">Yıllık</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">İlk Gelir Ayı</label>
+                    <input class="form-control" type="month" id="rci-start" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kategori</label>
+                <select class="form-control" id="rci-category">
+                    <option>Maaş</option>
+                    <option>Freelance</option>
+                    <option>Kira Geliri</option>
+                    <option>Yatırım</option>
+                    <option>Diğer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama</label>
+                <input class="form-control" type="text" id="rci-desc" placeholder="Opsiyonel">
+            </div>
+            <div class="toggle-row">
+                <span class="form-label" style="margin:0">Aktif</span>
+                <label class="toggle">
+                    <input type="checkbox" id="rci-active" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('rec-income')">İptal</button>
+                <button type="submit" class="btn btn-green">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ Modal: Birikim ══ -->
+<div class="modal-overlay" id="modal-savings">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-savings-title">Birikim Ekle</span>
+            <button class="modal-close" onclick="closeModal('savings')">&#10005;</button>
+        </div>
+        <form id="form-savings" onsubmit="saveTx(event)">
+            <input type="hidden" id="sv-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Tür</label>
+                    <select class="form-control" id="sv-type">
+                        <option>Mevduat</option>
+                        <option>Nakit</option>
+                        <option>Hisse Senedi</option>
+                        <option>Dolar</option>
+                        <option>Euro</option>
+                        <option>Altın</option>
+                        <option>Konut</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tarih</label>
+                    <input class="form-control" type="date" id="sv-date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Etiket (opsiyonel)</label>
+                <input class="form-control" type="text" id="sv-label" placeholder="Ziraat Mevduatı, Apple AAPL...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Miktar (&#8378;) — negatif = çekim</label>
+                <input class="form-control" type="number" id="sv-amount" step="0.01" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Not (opsiyonel)</label>
+                <input class="form-control" type="text" id="sv-note" placeholder="Opsiyonel">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('savings')">İptal</button>
+                <button type="submit" class="btn" style="background:#7C3AED">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+// ────────────────────────────────────────────────
+// DATA
+// ────────────────────────────────────────────────
+
+const KEY = { incomes: 'fbt_incomes', expenses: 'fbt_expenses', recurring: 'fbt_recurring', rec_income: 'fbt_rec_income', savings: 'fbt_savings' };
+
+function load(k)       { try { return JSON.parse(localStorage.getItem(KEY[k])) || []; } catch { return []; } }
+function persist(k, d) { localStorage.setItem(KEY[k], JSON.stringify(d)); }
+function uid()         { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ────────────────────────────────────────────────
+// STATE
+// ────────────────────────────────────────────────
+
+let CY = new Date().getFullYear();
+let CM = new Date().getMonth(); // 0-indexed
+
+// ────────────────────────────────────────────────
+// HELPERS
+// ────────────────────────────────────────────────
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+const CAT_COLORS = {
+    'Market':'#10B981','Ulaşım':'#3B82F6','Kira':'#8B5CF6',
+    'Abonelik':'#EC4899','Lüks':'#F59E0B','Sağlık':'#EF4444',
+    'Eğitim':'#06B6D4','Eğlence':'#F97316','Restoran':'#84CC16',
+    'Giyim':'#A855F7','Fatura':'#64748B','Kredi Ödemesi':'#F43F5E',
+    'Kira Geliri':'#8B5CF6','Maaş':'#10B981','Freelance':'#3B82F6','Diğer':'#94A3B8'
+};
+
+function catColor(c) { return CAT_COLORS[c] || '#94A3B8'; }
+
+const SAV_COLORS = {
+    'Mevduat':      '#06B6D4',
+    'Nakit':        '#10B981',
+    'Hisse Senedi': '#3B82F6',
+    'Dolar':        '#F59E0B',
+    'Euro':         '#6366F1',
+    'Altın':        '#F97316',
+    'Konut':        '#8B5CF6'
+};
+function savColor(t) { return SAV_COLORS[t] || '#94A3B8'; }
+
+function money(n) {
+    return '₺' + Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(s) {
+    if (!s) return '';
+    const [y, m, d] = s.split('-');
+    return `${parseInt(d)} ${MONTHS_TR[parseInt(m)-1]} ${y}`;
+}
+
+function inMonth(dateStr) {
+    const [y, m] = dateStr.split('-').map(Number);
+    return y === CY && m === CM + 1;
+}
+
+function today() {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+
+function esc(s) {
+    return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ────────────────────────────────────────────────
+// CHARTS
+// ────────────────────────────────────────────────
+
+let chartCat = null, chartFV = null;
+
+function renderCharts() {
+    const expenses  = load('expenses').filter(e => inMonth(e.date));
+    const recurring = load('recurring').filter(r => recExpApplies(r, CY, CM));
+
+    // build category totals
+    const totals = {};
+    expenses.forEach(e  => { totals[e.category] = (totals[e.category] || 0) + Number(e.amount); });
+    recurring.forEach(r => { totals[r.category] = (totals[r.category] || 0) + Number(r.amount); });
+
+    const cats   = Object.keys(totals);
+    const vals   = cats.map(c => totals[c]);
+    const colors = cats.map(c => catColor(c));
+    const grand  = vals.reduce((a,b) => a+b, 0);
+
+    // ── Doughnut ──
+    const ctx1 = document.getElementById('categoryChart').getContext('2d');
+    if (chartCat) chartCat.destroy();
+    if (cats.length === 0) {
+        ctx1.clearRect(0,0,ctx1.canvas.width,ctx1.canvas.height);
+        ctx1.fillStyle = '#475569'; ctx1.font = '13px sans-serif'; ctx1.textAlign = 'center';
+        ctx1.fillText('Bu ay gider yok', ctx1.canvas.width/2, ctx1.canvas.height/2);
+    } else {
+        chartCat = new Chart(ctx1, {
+            type: 'doughnut',
+            data: { labels: cats, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '62%',
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#94A3B8', boxWidth: 11, padding: 10, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: c => ` ${c.label}: ${money(c.raw)}` } }
+                }
+            }
+        });
+    }
+
+    // ── Bar: fixed vs variable ──
+    const fixedTotal = recurring.reduce((s,r) => s + Number(r.amount), 0);
+    const varTotal   = expenses.reduce((s,e) => s + Number(e.amount), 0);
+    const ctx2 = document.getElementById('fixedVarChart').getContext('2d');
+    if (chartFV) chartFV.destroy();
+    chartFV = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: ['Sabit (Düzenli)', 'Değişken'],
+            datasets: [{
+                data: [fixedTotal, varTotal],
+                backgroundColor: ['#8B5CF6', '#3B82F6'],
+                borderRadius: 8, borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => money(c.raw) } } },
+            scales: {
+                x: { ticks: { color: '#94A3B8' }, grid: { display: false } },
+                y: { ticks: { color: '#94A3B8', callback: v => '₺' + Number(v).toLocaleString('tr-TR') }, grid: { color: '#334155' } }
+            }
+        }
+    });
+
+    // ── Category breakdown list ──
+    const bd = document.getElementById('categoryBreakdown');
+    if (cats.length === 0) { bd.innerHTML = '<div class="empty-state">Bu ay gider verisi yok.</div>'; return; }
+    const sorted = cats.map((c,i) => ({ c, v: vals[i] })).sort((a,b) => b.v - a.v);
+    bd.innerHTML = sorted.map(({ c, v }) => `
+        <div class="breakdown-item">
+            <span class="breakdown-name" style="color:${catColor(c)}">${esc(c)}</span>
+            <div class="breakdown-bar-wrap">
+                <div class="breakdown-bar" style="width:${Math.round(v/grand*100)}%;background:${catColor(c)}"></div>
+            </div>
+            <span class="breakdown-val">${money(v)}</span>
+        </div>
+    `).join('');
+}
+
+// ────────────────────────────────────────────────
+// DASHBOARD
+// ────────────────────────────────────────────────
+
+function renderDashboard() {
+    const incomes      = load('incomes').filter(i => inMonth(i.date));
+    const expenses     = load('expenses').filter(e => inMonth(e.date));
+    const recurring    = load('recurring').filter(r => recExpApplies(r, CY, CM));
+    const recIncomes   = load('rec_income').filter(r => recIncomeApplies(r, CY, CM));
+
+    const varIncome    = incomes.reduce((s,i) => s + Number(i.amount), 0);
+    const fixedIncome  = recIncomes.reduce((s,r) => s + Number(r.amount), 0);
+    const totalIncome  = varIncome + fixedIncome;
+    const varExp       = expenses.reduce((s,e) => s + Number(e.amount), 0);
+    const fixedExp     = recurring.reduce((s,r) => s + Number(r.amount), 0);
+    const totalExpense = varExp + fixedExp;
+    const net          = totalIncome - totalExpense;
+
+    const totalSavings = load('savings').reduce((s,x) => s + Number(x.amount), 0);
+
+    document.getElementById('dash-income').textContent  = money(totalIncome);
+    document.getElementById('dash-expense').textContent = money(totalExpense);
+    document.getElementById('dash-net').textContent     = money(net);
+    document.getElementById('dash-net').className       = 'card-value ' + (net >= 0 ? 'green' : 'red');
+    document.getElementById('dash-fixed').textContent   = money(fixedExp);
+    document.getElementById('dash-savings').textContent = money(totalSavings);
+
+    renderCharts();
+}
+
+// ────────────────────────────────────────────────
+// INCOMES
+// ────────────────────────────────────────────────
+
+function renderIncomes() {
+    const list     = document.getElementById('income-list');
+    const regulars = load('incomes').filter(i => inMonth(i.date)).sort((a,b) => b.date.localeCompare(a.date));
+    const recs     = load('rec_income').filter(r => recIncomeApplies(r, CY, CM));
+
+    if (!regulars.length && !recs.length) {
+        list.innerHTML = '<div class="empty-state">Bu ay için gelir kaydı yok.<br>Sağ üstteki butona tıklayarak ekleyin.</div>';
+        return;
+    }
+
+    const regularHTML = regulars.map(i => `
+        <div class="list-item">
+            <div class="list-item-left">
+                <span class="list-item-name">${esc(i.description || i.category)}</span>
+                <div class="list-item-meta">
+                    <span>${fmtDate(i.date)}</span>
+                    <span class="badge badge-cat">${esc(i.category)}</span>
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-income">${money(i.amount)}</span>
+                <button class="btn btn-sm btn-ghost" onclick="editIncome('${i.id}')">&#9998;</button>
+                <button class="btn btn-sm btn-red"   onclick="deleteIncome('${i.id}')">&#128465;</button>
+            </div>
+        </div>
+    `).join('');
+
+    const recHTML = recs.map(r => `
+        <div class="list-item" style="border-color:#10B98133">
+            <div class="list-item-left">
+                <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                    <span class="list-item-name">${esc(r.name)}</span>
+                    <span class="badge badge-rec">Düzenli · Ayın ${r.dayOfMonth || 1}. günü</span>
+                </div>
+                <div class="list-item-meta">
+                    <span class="badge badge-cat">${esc(r.category)}</span>
+                    ${r.description ? `<span>${esc(r.description)}</span>` : ''}
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-income">${money(r.amount)}</span>
+                <button class="btn btn-sm btn-ghost" onclick="editRecurringIncome('${r.id}')">&#9998;</button>
+            </div>
+        </div>
+    `).join('');
+
+    list.innerHTML = regularHTML + recHTML;
+}
+
+function editIncome(id) {
+    const i = load('incomes').find(x => x.id === id);
+    if (!i) return;
+    document.getElementById('income-id').value       = i.id;
+    document.getElementById('income-amount').value   = i.amount;
+    document.getElementById('income-date').value     = i.date;
+    document.getElementById('income-category').value = i.category;
+    document.getElementById('income-desc').value     = i.description || '';
+    document.getElementById('modal-income-title').textContent = 'Geliri Düzenle';
+    document.getElementById('modal-income').classList.add('open');
+}
+
+function saveIncome(e) {
+    e.preventDefault();
+    const id = document.getElementById('income-id').value;
+    const entry = {
+        id: id || uid(),
+        amount: parseFloat(document.getElementById('income-amount').value),
+        date:   document.getElementById('income-date').value,
+        category: document.getElementById('income-category').value,
+        description: document.getElementById('income-desc').value.trim()
+    };
+    const arr = load('incomes');
+    if (id) { const idx = arr.findIndex(x => x.id === id); if (idx > -1) arr[idx] = entry; }
+    else arr.push(entry);
+    persist('incomes', arr);
+    closeModal('income');
+    renderAll();
+}
+
+function deleteIncome(id) {
+    if (!confirm('Bu geliri silmek istiyor musunuz?')) return;
+    persist('incomes', load('incomes').filter(x => x.id !== id));
+    renderAll();
+}
+
+// ────────────────────────────────────────────────
+// EXPENSES
+// ────────────────────────────────────────────────
+
+const EXP_CATS = ['Market','Ulaşım','Kira','Abonelik','Lüks','Sağlık','Eğitim','Eğlence','Restoran','Giyim','Fatura','Kredi Ödemesi','Diğer'];
+
+function populateCatFilter() {
+    const sel = document.getElementById('expCatFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tüm Kategoriler</option>' +
+        EXP_CATS.map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+}
+
+function renderExpenses() {
+    const catF    = document.getElementById('expCatFilter').value;
+    let regulars  = load('expenses').filter(e => inMonth(e.date));
+    if (catF) regulars = regulars.filter(e => e.category === catF);
+    regulars.sort((a,b) => b.date.localeCompare(a.date));
+
+    let recs = load('recurring').filter(r => recExpApplies(r, CY, CM));
+    if (catF) recs = recs.filter(r => r.category === catF);
+
+    const list = document.getElementById('expense-list');
+    if (!regulars.length && !recs.length) {
+        list.innerHTML = '<div class="empty-state">Bu ay için gider kaydı yok.<br>Sağ üstteki butona tıklayarak ekleyin.</div>';
+        return;
+    }
+
+    const regularHTML = regulars.map(e => `
+        <div class="list-item">
+            <div class="list-item-left">
+                <span class="list-item-name">${esc(e.description || e.category)}</span>
+                <div class="list-item-meta">
+                    <span>${fmtDate(e.date)}</span>
+                    <span class="badge badge-cat">${esc(e.category)}</span>
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-expense">${money(e.amount)}</span>
+                <button class="btn btn-sm btn-ghost" onclick="editExpense('${e.id}')">&#9998;</button>
+                <button class="btn btn-sm btn-red"   onclick="deleteExpense('${e.id}')">&#128465;</button>
+            </div>
+        </div>
+    `).join('');
+
+    const recHTML = recs.map(r => {
+        const ml = monthsLeft(r.endYearMonth);
+        const endInfo = r.endYearMonth
+            ? (ml === 0 ? ' · Son ay' : ` · ${ml} ay kaldı`)
+            : '';
+        return `
+        <div class="list-item" style="border-color:#EF444433">
+            <div class="list-item-left">
+                <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                    <span class="list-item-name">${esc(r.name)}</span>
+                    <span class="badge badge-rec">Düzenli · Ayın ${r.dayOfMonth || 1}. günü${endInfo}</span>
+                </div>
+                <div class="list-item-meta">
+                    <span class="badge badge-cat">${esc(r.category)}</span>
+                    ${r.description ? `<span>${esc(r.description)}</span>` : ''}
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-expense">${money(r.amount)}</span>
+                <button class="btn btn-sm btn-ghost" onclick="editRecurring('${r.id}')">&#9998;</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    list.innerHTML = regularHTML + recHTML;
+}
+
+function editExpense(id) {
+    const e = load('expenses').find(x => x.id === id);
+    if (!e) return;
+    document.getElementById('expense-id').value       = e.id;
+    document.getElementById('expense-amount').value   = e.amount;
+    document.getElementById('expense-date').value     = e.date;
+    document.getElementById('expense-category').value = e.category;
+    document.getElementById('expense-desc').value     = e.description || '';
+    document.getElementById('modal-expense-title').textContent = 'Gideri Düzenle';
+    document.getElementById('modal-expense').classList.add('open');
+}
+
+function saveExpense(e) {
+    e.preventDefault();
+    const id = document.getElementById('expense-id').value;
+    const entry = {
+        id: id || uid(),
+        amount: parseFloat(document.getElementById('expense-amount').value),
+        date:   document.getElementById('expense-date').value,
+        category: document.getElementById('expense-category').value,
+        description: document.getElementById('expense-desc').value.trim()
+    };
+    const arr = load('expenses');
+    if (id) { const idx = arr.findIndex(x => x.id === id); if (idx > -1) arr[idx] = entry; }
+    else arr.push(entry);
+    persist('expenses', arr);
+    closeModal('expense');
+    renderAll();
+}
+
+function deleteExpense(id) {
+    if (!confirm('Bu gideri silmek istiyor musunuz?')) return;
+    persist('expenses', load('expenses').filter(x => x.id !== id));
+    renderAll();
+}
+
+// ────────────────────────────────────────────────
+// RECURRING
+// ────────────────────────────────────────────────
+
+// year: full, month: 0-indexed
+function recExpApplies(r, year, month) {
+    if (!r.isActive) return false;
+    if (!r.endYearMonth) return true;
+    const [ey, em] = r.endYearMonth.split('-').map(Number);
+    return year < ey || (year === ey && month + 1 <= em);
+}
+
+function monthsLeft(endYM) {
+    if (!endYM) return null;
+    const [ey, em] = endYM.split('-').map(Number);
+    const now = new Date();
+    return (ey - now.getFullYear()) * 12 + (em - (now.getMonth() + 1));
+}
+
+function renderRecurring() {
+    const items = load('recurring');
+    const list  = document.getElementById('recurring-list');
+    if (!items.length) {
+        list.innerHTML = '<div class="empty-state">Henüz düzenli gider yok.<br>Netflix, kira, fatura gibi her ay tekrarlayan giderleri buraya ekleyin.</div>';
+        return;
+    }
+    list.innerHTML = items.map(r => {
+        const ml = monthsLeft(r.endYearMonth);
+        const ended = r.endYearMonth && ml < 0;
+        let endBadge = '';
+        if (r.endYearMonth) {
+            if (ended) {
+                endBadge = `<span class="badge badge-inactive">Bitti (${r.endYearMonth})</span>`;
+            } else if (ml === 0) {
+                endBadge = `<span class="badge" style="background:#F59E0B22;color:#FCD34D;border:1px solid #F59E0B55">Son ay</span>`;
+            } else {
+                endBadge = `<span class="badge" style="background:#3B82F622;color:#93C5FD;border:1px solid #3B82F655">${ml} ay kaldı</span>`;
+            }
+        }
+        return `
+        <div class="list-item">
+            <div class="list-item-left">
+                <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                    <span class="list-item-name">${esc(r.name)}</span>
+                    <span class="badge ${r.isActive && !ended ? 'badge-active' : 'badge-inactive'}">${r.isActive && !ended ? 'Aktif' : ended ? 'Bitti' : 'Pasif'}</span>
+                    <span class="badge badge-rec">Ayın ${r.dayOfMonth || 1}. günü</span>
+                    ${endBadge}
+                </div>
+                <div class="list-item-meta">
+                    <span class="badge badge-cat">${esc(r.category)}</span>
+                    ${r.description ? `<span>${esc(r.description)}</span>` : ''}
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-expense">${money(r.amount)}</span>
+                <button class="btn btn-sm ${r.isActive ? 'btn-ghost' : 'btn-green'}" onclick="toggleRecurring('${r.id}')">${r.isActive ? 'Durdur' : 'Aktifleştir'}</button>
+                <button class="btn btn-sm btn-ghost" onclick="editRecurring('${r.id}')">&#9998;</button>
+                <button class="btn btn-sm btn-red"   onclick="deleteRecurring('${r.id}')">&#128465;</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function editRecurring(id) {
+    const r = load('recurring').find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('rec-id').value       = r.id;
+    document.getElementById('rec-name').value     = r.name;
+    document.getElementById('rec-amount').value   = r.amount;
+    document.getElementById('rec-day').value      = r.dayOfMonth || 1;
+    document.getElementById('rec-end').value      = r.endYearMonth || '';
+    document.getElementById('rec-category').value = r.category;
+    document.getElementById('rec-desc').value     = r.description || '';
+    document.getElementById('rec-active').checked = r.isActive;
+    updateEndPreview();
+    document.getElementById('modal-recurring-title').textContent = 'Düzenli Gideri Düzenle';
+    document.getElementById('modal-recurring').classList.add('open');
+}
+
+function saveRecurring(e) {
+    e.preventDefault();
+    const id = document.getElementById('rec-id').value;
+    const entry = {
+        id: id || uid(),
+        name:         document.getElementById('rec-name').value.trim(),
+        amount:       parseFloat(document.getElementById('rec-amount').value),
+        dayOfMonth:   parseInt(document.getElementById('rec-day').value) || 1,
+        endYearMonth: document.getElementById('rec-end').value || null,
+        category:     document.getElementById('rec-category').value,
+        description:  document.getElementById('rec-desc').value.trim(),
+        isActive:     document.getElementById('rec-active').checked
+    };
+    const arr = load('recurring');
+    if (id) { const idx = arr.findIndex(x => x.id === id); if (idx > -1) arr[idx] = entry; }
+    else arr.push(entry);
+    persist('recurring', arr);
+    closeModal('recurring');
+    renderAll();
+}
+
+function toggleRecurring(id) {
+    const arr = load('recurring');
+    const r   = arr.find(x => x.id === id);
+    if (r) r.isActive = !r.isActive;
+    persist('recurring', arr);
+    renderAll();
+}
+
+function deleteRecurring(id) {
+    if (!confirm('Bu düzenli gideri silmek istiyor musunuz?')) return;
+    persist('recurring', load('recurring').filter(x => x.id !== id));
+    renderAll();
+}
+
+// ────────────────────────────────────────────────
+// RECURRING INCOME
+// ────────────────────────────────────────────────
+
+const FREQ_LABEL = { 1: 'Aylık', 3: '3 Ayda Bir', 6: '6 Ayda Bir', 12: 'Yıllık' };
+
+// year: full year, month: 0-indexed
+function recIncomeApplies(r, year, month) {
+    if (!r.isActive) return false;
+    const freq = Number(r.frequency) || 1;
+    const start = r.startYearMonth || `${year}-${String(month+1).padStart(2,'0')}`;
+    const [sy, sm] = start.split('-').map(Number);
+    const diff = (year - sy) * 12 + (month + 1 - sm);
+    return diff >= 0 && diff % freq === 0;
+}
+
+function renderRecurringIncomes() {
+    const items = load('rec_income');
+    const list  = document.getElementById('recurring-income-list');
+    if (!items.length) {
+        list.innerHTML = '<div class="empty-state">Henüz düzenli gelir yok.<br>Maaş, kira geliri gibi her ay tekrarlayan gelirleri buraya ekleyin.</div>';
+        return;
+    }
+    list.innerHTML = items.map(r => `
+        <div class="list-item">
+            <div class="list-item-left">
+                <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                    <span class="list-item-name">${esc(r.name)}</span>
+                    <span class="badge ${r.isActive ? 'badge-active' : 'badge-inactive'}">${r.isActive ? 'Aktif' : 'Pasif'}</span>
+                    <span class="badge badge-rec">${FREQ_LABEL[r.frequency||1] || r.frequency+' Ayda Bir'} · Ayın ${r.dayOfMonth || 1}. günü</span>
+                </div>
+                <div class="list-item-meta">
+                    <span class="badge badge-cat">${esc(r.category)}</span>
+                    ${r.startYearMonth ? `<span>İlk: ${r.startYearMonth}</span>` : ''}
+                    ${r.description ? `<span>${esc(r.description)}</span>` : ''}
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-income">${money(r.amount)}</span>
+                <button class="btn btn-sm ${r.isActive ? 'btn-ghost' : 'btn-green'}" onclick="toggleRecurringIncome('${r.id}')">${r.isActive ? 'Durdur' : 'Aktifleştir'}</button>
+                <button class="btn btn-sm btn-ghost" onclick="editRecurringIncome('${r.id}')">&#9998;</button>
+                <button class="btn btn-sm btn-red"   onclick="deleteRecurringIncome('${r.id}')">&#128465;</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editRecurringIncome(id) {
+    const r = load('rec_income').find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('rci-id').value          = r.id;
+    document.getElementById('rci-name').value        = r.name;
+    document.getElementById('rci-amount').value      = r.amount;
+    document.getElementById('rci-day').value         = r.dayOfMonth || 1;
+    document.getElementById('rci-frequency').value   = r.frequency || 1;
+    document.getElementById('rci-start').value       = r.startYearMonth || '';
+    document.getElementById('rci-category').value    = r.category;
+    document.getElementById('rci-desc').value        = r.description || '';
+    document.getElementById('rci-active').checked    = r.isActive;
+    document.getElementById('modal-rec-income-title').textContent = 'Düzenli Geliri Düzenle';
+    document.getElementById('modal-rec-income').classList.add('open');
+}
+
+function saveRecurringIncome(e) {
+    e.preventDefault();
+    const id = document.getElementById('rci-id').value;
+    const entry = {
+        id: id || uid(),
+        name:       document.getElementById('rci-name').value.trim(),
+        amount:     parseFloat(document.getElementById('rci-amount').value),
+        dayOfMonth:     parseInt(document.getElementById('rci-day').value) || 1,
+        frequency:      parseInt(document.getElementById('rci-frequency').value) || 1,
+        startYearMonth: document.getElementById('rci-start').value,
+        category:       document.getElementById('rci-category').value,
+        description:    document.getElementById('rci-desc').value.trim(),
+        isActive:       document.getElementById('rci-active').checked
+    };
+    const arr = load('rec_income');
+    if (id) { const idx = arr.findIndex(x => x.id === id); if (idx > -1) arr[idx] = entry; }
+    else arr.push(entry);
+    persist('rec_income', arr);
+    closeModal('rec-income');
+    renderAll();
+}
+
+function toggleRecurringIncome(id) {
+    const arr = load('rec_income');
+    const r   = arr.find(x => x.id === id);
+    if (r) r.isActive = !r.isActive;
+    persist('rec_income', arr);
+    renderAll();
+}
+
+function deleteRecurringIncome(id) {
+    if (!confirm('Bu düzenli geliri silmek istiyor musunuz?')) return;
+    persist('rec_income', load('rec_income').filter(x => x.id !== id));
+    renderAll();
+}
+
+// ────────────────────────────────────────────────
+// MODALS
+// ────────────────────────────────────────────────
+
+function openModal(type) {
+    const t = today();
+    if (type === 'income') {
+        document.getElementById('income-id').value       = '';
+        document.getElementById('income-amount').value   = '';
+        document.getElementById('income-date').value     = t;
+        document.getElementById('income-category').value = 'Maaş';
+        document.getElementById('income-desc').value     = '';
+        document.getElementById('modal-income-title').textContent = 'Gelir Ekle';
+    } else if (type === 'expense') {
+        document.getElementById('expense-id').value       = '';
+        document.getElementById('expense-amount').value   = '';
+        document.getElementById('expense-date').value     = t;
+        document.getElementById('expense-category').value = 'Market';
+        document.getElementById('expense-desc').value     = '';
+        document.getElementById('modal-expense-title').textContent = 'Gider Ekle';
+    } else if (type === 'recurring') {
+        document.getElementById('rec-id').value       = '';
+        document.getElementById('rec-name').value     = '';
+        document.getElementById('rec-amount').value   = '';
+        document.getElementById('rec-day').value      = '1';
+        document.getElementById('rec-end').value      = '';
+        document.getElementById('rec-category').value = 'Abonelik';
+        document.getElementById('rec-desc').value     = '';
+        document.getElementById('rec-active').checked = true;
+        updateEndPreview();
+        document.getElementById('modal-recurring-title').textContent = 'Düzenli Gider Ekle';
+    } else if (type === 'rec-income') {
+        document.getElementById('rci-id').value       = '';
+        document.getElementById('rci-name').value        = '';
+        document.getElementById('rci-amount').value      = '';
+        document.getElementById('rci-day').value         = '1';
+        document.getElementById('rci-frequency').value   = '1';
+        document.getElementById('rci-start').value       = `${CY}-${String(CM+1).padStart(2,'0')}`;
+        document.getElementById('rci-category').value    = 'Maaş';
+        document.getElementById('rci-desc').value        = '';
+        document.getElementById('rci-active').checked    = true;
+        document.getElementById('modal-rec-income-title').textContent = 'Düzenli Gelir Ekle';
+    } else if (type === 'savings') {
+        document.getElementById('sv-id').value     = '';
+        document.getElementById('sv-id').dataset.fromMonth = '';
+        document.getElementById('sv-type').value   = 'Mevduat';
+        document.getElementById('sv-date').value   = today();
+        document.getElementById('sv-label').value  = '';
+        document.getElementById('sv-amount').value = '';
+        document.getElementById('sv-note').value   = '';
+        document.getElementById('modal-savings-title').textContent = 'Birikim Ekle';
+    }
+    document.getElementById('modal-' + type).classList.add('open');
+}
+
+function closeModal(type) {
+    document.getElementById('modal-' + type).classList.remove('open');
+}
+
+// End month preview
+function updateEndPreview() {
+    const val = document.getElementById('rec-end').value;
+    const el  = document.getElementById('rec-end-preview');
+    if (!val) { el.textContent = 'Süresiz'; return; }
+    const ml = monthsLeft(val);
+    if (ml < 0)      el.textContent = 'Geçmiş bir tarih';
+    else if (ml === 0) el.textContent = 'Bu ay son ödeme';
+    else             el.textContent = `${ml} ay kaldı`;
+}
+document.getElementById('rec-end').addEventListener('input', updateEndPreview);
+
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', e => {
+        if (e.target === el) closeModal(el.id.replace('modal-', ''));
+    });
+});
+
+// Close on Escape key
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(el => {
+            closeModal(el.id.replace('modal-', ''));
+        });
+    }
+});
+
+// ────────────────────────────────────────────────
+// TABS
+// ────────────────────────────────────────────────
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+// ────────────────────────────────────────────────
+// MONTH NAV
+// ────────────────────────────────────────────────
+
+function updateMonthLabel() {
+    document.getElementById('monthLabel').textContent = `${MONTHS_TR[CM]} ${CY}`;
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+    if (CM === 0) { CM = 11; CY--; } else CM--;
+    updateMonthLabel(); renderAll();
+});
+
+document.getElementById('nextMonth').addEventListener('click', () => {
+    if (CM === 11) { CM = 0; CY++; } else CM++;
+    updateMonthLabel(); renderAll();
+});
+
+// ────────────────────────────────────────────────
+// SAVINGS
+// ────────────────────────────────────────────────
+
+let chartSavings = null;
+
+function savingsSummary() {
+    const map = {};
+    load('savings').forEach(x => {
+        map[x.type] = (map[x.type] || 0) + Number(x.amount);
+    });
+    return map;
+}
+
+function renderSavings() {
+    const items = load('savings').sort((a,b) => b.date.localeCompare(a.date));
+    const summary = savingsSummary();
+    const types = Object.keys(summary).filter(t => summary[t] !== 0);
+    const grand = Object.values(summary).reduce((s,v) => s + v, 0);
+
+    // ── Tür kartları ──
+    const cardWrap = document.getElementById('savings-type-cards');
+    if (types.length === 0) {
+        cardWrap.innerHTML = '';
+    } else {
+        cardWrap.innerHTML = `
+            <div class="card">
+                <div class="card-label">Toplam Birikim</div>
+                <div class="card-value" style="color:#A78BFA">${money(grand)}</div>
+            </div>
+            ${types.map(t => `
+            <div class="card">
+                <div class="card-label">${esc(t)}</div>
+                <div class="card-value" style="color:${savColor(t)}">${money(summary[t])}</div>
+            </div>`).join('')}`;
+    }
+
+    // ── Grafik ──
+    if (chartSavings) { chartSavings.destroy(); chartSavings = null; }
+    const ctx = document.getElementById('savingsChart').getContext('2d');
+    if (types.length === 0) {
+        ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+        ctx.fillStyle = '#475569'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Henüz birikim yok', ctx.canvas.width/2, ctx.canvas.height/2);
+    } else {
+        chartSavings = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: types,
+                datasets: [{ data: types.map(t => Math.max(summary[t], 0)), backgroundColor: types.map(t => savColor(t)), borderWidth: 0, hoverOffset: 6 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '62%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#F1F5F9', boxWidth: 12, padding: 12, font: { size: 13 },
+                            generateLabels(chart) {
+                                const ds = chart.data.datasets[0];
+                                const total = ds.data.reduce((a,b) => a+b, 0);
+                                return chart.data.labels.map((label, i) => ({
+                                    text: `${label}  %${total > 0 ? Math.round(ds.data[i]/total*100) : 0}`,
+                                    fillStyle: ds.backgroundColor[i],
+                                    strokeStyle: ds.backgroundColor[i],
+                                    fontColor: '#F1F5F9',
+                                    lineWidth: 0,
+                                    index: i
+                                }));
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: c => {
+                                const total = c.dataset.data.reduce((a,b) => a+b, 0);
+                                const pct = total > 0 ? Math.round(c.raw/total*100) : 0;
+                                return ` ${c.label}: ${money(c.raw)}  (%${pct})`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Breakdown listesi ──
+    const bd = document.getElementById('savings-breakdown');
+    if (types.length === 0) {
+        bd.innerHTML = '<div class="empty-state" style="padding:20px">Henüz birikim yok.</div>';
+    } else {
+        const maxVal = Math.max(...types.map(t => Math.abs(summary[t])));
+        bd.innerHTML = types.sort((a,b) => summary[b]-summary[a]).map(t => `
+            <div class="breakdown-item">
+                <span class="breakdown-name" style="color:${savColor(t)}">${esc(t)}</span>
+                <div class="breakdown-bar-wrap">
+                    <div class="breakdown-bar" style="width:${maxVal>0?Math.round(Math.abs(summary[t])/maxVal*100):0}%;background:${savColor(t)}"></div>
+                </div>
+                <span class="breakdown-val">${money(summary[t])}</span>
+            </div>`).join('');
+    }
+
+    // ── Hareket listesi ──
+    const list = document.getElementById('savings-list');
+    if (!items.length) {
+        list.innerHTML = '<div class="empty-state">Henüz birikim hareketi yok.<br>"Birikim Ekle" veya "Bu Ayın Net Bakiyesini Ekle" butonunu kullanın.</div>';
+        return;
+    }
+    list.innerHTML = items.map(x => `
+        <div class="list-item">
+            <div class="list-item-left">
+                <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                    <span class="list-item-name">${esc(x.label || x.type)}</span>
+                    <span class="badge" style="background:${savColor(x.type)}22;color:${savColor(x.type)};border:1px solid ${savColor(x.type)}55">${esc(x.type)}</span>
+                    ${x.fromMonth ? `<span class="badge badge-rec">Aylık net</span>` : ''}
+                </div>
+                <div class="list-item-meta">
+                    <span>${fmtDate(x.date)}</span>
+                    ${x.note ? `<span>${esc(x.note)}</span>` : ''}
+                </div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount ${Number(x.amount) >= 0 ? 'amount-income' : 'amount-expense'}">${Number(x.amount) >= 0 ? '+' : ''}${money(x.amount)}</span>
+                <button class="btn btn-sm btn-ghost" onclick="editTx('${x.id}')">&#9998;</button>
+                <button class="btn btn-sm btn-red"   onclick="deleteTx('${x.id}')">&#128465;</button>
+            </div>
+        </div>`).join('');
+}
+
+function editTx(id) {
+    const x = load('savings').find(s => s.id === id);
+    if (!x) return;
+    document.getElementById('sv-id').value     = x.id;
+    document.getElementById('sv-type').value   = x.type;
+    document.getElementById('sv-date').value   = x.date;
+    document.getElementById('sv-label').value  = x.label || '';
+    document.getElementById('sv-amount').value = x.amount;
+    document.getElementById('sv-note').value   = x.note || '';
+    document.getElementById('modal-savings-title').textContent = 'Birikimi Düzenle';
+    document.getElementById('modal-savings').classList.add('open');
+}
+
+function saveTx(e) {
+    e.preventDefault();
+    const id = document.getElementById('sv-id').value;
+    const entry = {
+        id:        id || uid(),
+        type:      document.getElementById('sv-type').value,
+        date:      document.getElementById('sv-date').value,
+        label:     document.getElementById('sv-label').value.trim(),
+        amount:    parseFloat(document.getElementById('sv-amount').value),
+        note:      document.getElementById('sv-note').value.trim(),
+        fromMonth: document.getElementById('sv-id').dataset.fromMonth === '1'
+    };
+    document.getElementById('sv-id').dataset.fromMonth = '';
+    const arr = load('savings');
+    if (id) { const idx = arr.findIndex(s => s.id === id); if (idx > -1) { entry.fromMonth = arr[idx].fromMonth; arr[idx] = entry; } }
+    else arr.push(entry);
+    persist('savings', arr);
+    closeModal('savings');
+    renderAll();
+}
+
+function deleteTx(id) {
+    if (!confirm('Bu birikim kaydını silmek istiyor musunuz?')) return;
+    persist('savings', load('savings').filter(s => s.id !== id));
+    renderAll();
+}
+
+function addNetBalance() {
+    // Seçili ayın net bakiyesini hesapla
+    const incomes   = load('incomes').filter(i => inMonth(i.date));
+    const expenses  = load('expenses').filter(e => inMonth(e.date));
+    const recurring = load('recurring').filter(r => recExpApplies(r, CY, CM));
+    const recInc    = load('rec_income').filter(r => recIncomeApplies(r, CY, CM));
+
+    const totalIncome  = incomes.reduce((s,i) => s+Number(i.amount),0) + recInc.reduce((s,r) => s+Number(r.amount),0);
+    const totalExpense = expenses.reduce((s,e) => s+Number(e.amount),0) + recurring.reduce((s,r) => s+Number(r.amount),0);
+    const net = totalIncome - totalExpense;
+
+    // Modal'ı pre-fill et
+    document.getElementById('sv-id').value     = '';
+    document.getElementById('sv-type').value   = 'Nakit';
+    document.getElementById('sv-date').value   = `${CY}-${String(CM+1).padStart(2,'0')}-01`;
+    document.getElementById('sv-label').value  = '';
+    document.getElementById('sv-amount').value = net.toFixed(2);
+    document.getElementById('sv-note').value   = `${MONTHS_TR[CM]} ${CY} net bakiye`;
+    document.getElementById('modal-savings-title').textContent = 'Net Bakiyeyi Birikime Ekle';
+    // fromMonth flag'ini saveTx'te otomatik true yapacağız
+    document.getElementById('sv-id').dataset.fromMonth = '1';
+    document.getElementById('modal-savings').classList.add('open');
+}
+
+// ────────────────────────────────────────────────
+// RENDER ALL + INIT
+// ────────────────────────────────────────────────
+
+function renderAll() {
+    renderDashboard();
+    renderIncomes();
+    renderExpenses();
+    renderRecurring();
+    renderRecurringIncomes();
+    renderSavings();
+    populateCatFilter();
+}
+
+updateMonthLabel();
+renderAll();
+</script>
+</body>
+</html>
